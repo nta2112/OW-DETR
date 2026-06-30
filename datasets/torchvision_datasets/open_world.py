@@ -250,7 +250,7 @@ class OWDetection(VisionDataset):
             image_id=torch.tensor([self.imgids[index]], dtype=torch.int64),
             labels=torch.tensor([i['category_id'] for i in instances], dtype=torch.int64),
             area=torch.tensor([i['area'] for i in instances], dtype=torch.float32),
-            boxes=torch.as_tensor([i['bbox'] for i in instances], dtype=torch.float32),
+            boxes=torch.as_tensor([i['bbox'] for i in instances], dtype=torch.float32).reshape(-1, 4),
             orig_size=torch.as_tensor([int(h), int(w)]),
             size=torch.as_tensor([int(h), int(w)]),
             iscrowd=torch.zeros(len(instances), dtype=torch.uint8)
