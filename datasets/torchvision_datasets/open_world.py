@@ -94,7 +94,22 @@ class OWDetection(VisionDataset):
         self.imgid2annotations = {}
         self.image_set = []
 
-        self.CLASS_NAMES = VOC_COCO_CLASS_NAMES
+        classes_file = os.path.join(self.root, 'classes.txt')
+        if os.path.exists(classes_file):
+            with open(classes_file, 'r') as f:
+                ip102_classes = [line.strip() for line in f.readlines() if line.strip()]
+                self.CLASS_NAMES = []
+                for cls_name in ip102_classes:
+                    parts = cls_name.split(maxsplit=1)
+                    if len(parts) > 1 and parts[0].isdigit():
+                        self.CLASS_NAMES.append(parts[1])
+                    else:
+                        self.CLASS_NAMES.append(cls_name)
+                if "unknown" not in self.CLASS_NAMES:
+                    self.CLASS_NAMES.append("unknown")
+                self.CLASS_NAMES = tuple(self.CLASS_NAMES)
+        else:
+            self.CLASS_NAMES = VOC_COCO_CLASS_NAMES
         self.MAX_NUM_OBJECTS = 64
         self.no_cats = no_cats
         self.args = args
@@ -160,7 +175,7 @@ class OWDetection(VisionDataset):
             bbox[0] -= 1.0
             bbox[1] -= 1.0
             instance = dict(
-                category_id=VOC_COCO_CLASS_NAMES.index(cls),
+                category_id=self.CLASS_NAMES.index(cls),
                 bbox=bbox,
                 area=(bbox[2] - bbox[0]) * (bbox[3] - bbox[1]),
                 image_id=img_id

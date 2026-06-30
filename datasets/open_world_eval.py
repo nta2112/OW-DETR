@@ -251,7 +251,8 @@ def parse_rec(filename, known_classes):
         if cls_name not in known_classes:
             cls_name = 'unknown'
         obj_struct['name'] = cls_name
-        obj_struct['difficult'] = int(obj.find('difficult').text)
+        difficult_elem = obj.find('difficult')
+        obj_struct['difficult'] = int(difficult_elem.text) if difficult_elem is not None else 0
         bbox = obj.find('bndbox')
         obj_struct['bbox'] = [int(bbox.find('xmin').text),
                               int(bbox.find('ymin').text),
