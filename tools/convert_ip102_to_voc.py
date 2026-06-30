@@ -12,7 +12,7 @@ def parse_args():
     parser.add_argument("--output_dir", default="data/IP102", type=str, help="Thư mục lưu dataset VOC2007 đầu ra")
     return parser.parse_args()
 
-def process_split(coco_dir, img_dir, output_dir, json_name, split_name, images_target_dir, annotations_target_dir, splits_target_dir):
+def process_split(coco_dir, img_dir, output_dir, json_name, split_name, images_target_dir, annotations_target_dir, splits_target_dir, classes):
     json_path = os.path.join(coco_dir, json_name)
     if not os.path.exists(json_path):
         print(f"File {json_path} không tồn tại, bỏ qua split này.")
@@ -72,7 +72,19 @@ def process_split(coco_dir, img_dir, output_dir, json_name, split_name, images_t
             if img_id in coco.imgToAnns:
                 for ann in coco.imgToAnns[img_id]:
                     cat_id = ann['category_id']
-                    cat_name = coco.cats[cat_id]['name']
+                    if cat_id in coco.cats:
+                        cat_name = coco.cats[cat_id]['name']
+                    elif (cat_id + 1) in coco.cats:
+                        cat_name = coco.cats[cat_id + 1]['name']
+                    elif len(classes) > 0:
+                        if 0 <= cat_id < len(classes):
+                            cat_name = classes[cat_id]
+                        elif 0 <= cat_id - 1 < len(classes):
+                            cat_name = classes[cat_id - 1]
+                        else:
+                            cat_name = f"class_{cat_id}"
+                    else:
+                        cat_name = f"class_{cat_id}"
                     
                     object_el = ET.SubElement(annotation_el, 'object')
                     ET.SubElement(object_el, 'name').text = cat_name
@@ -115,16 +127,27 @@ def main():
     os.makedirs(annotations_target_dir, exist_ok=True)
     os.makedirs(splits_target_dir, exist_ok=True)
     
-    # Copy file classes.txt gốc vào thư mục VOC2007
+    # Nạp danh sách lớp từ file classes.txt để dự phòng ánh xạ
+    classes = []
     if os.path.exists(args.classes_file):
+        with open(args.classes_file, 'r') as f:
+            for line in f.readlines():
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split(maxsplit=1)
+                if len(parts) > 1 and parts[0].isdigit():
+                    classes.append(parts[1])
+                else:
+                    classes.append(line)
         shutil.copy(args.classes_file, os.path.join(voc_dir, "classes.txt"))
         print(f"Đã copy {args.classes_file} sang {voc_dir}/classes.txt")
     else:
         print(f"Cảnh báo: Không thấy file classes.txt tại {args.classes_file}. Hãy tự chuẩn bị sau.")
 
-    process_split(args.coco_dir, args.img_dir, args.output_dir, "train.json", "train", images_target_dir, annotations_target_dir, splits_target_dir)
-    process_split(args.coco_dir, args.img_dir, args.output_dir, "val.json", "val", images_target_dir, annotations_target_dir, splits_target_dir)
-    process_split(args.coco_dir, args.img_dir, args.output_dir, "test.json", "test", images_target_dir, annotations_target_dir, splits_target_dir)
+    process_split(args.coco_dir, args.img_dir, args.output_dir, "train.json", "train", images_target_dir, annotations_target_dir, splits_target_dir, classes)
+    process_split(args.coco_dir, args.img_dir, args.output_dir, "val.json", "val", images_target_dir, annotations_target_dir, splits_target_dir, classes)
+    process_split(args.coco_dir, args.img_dir, args.output_dir, "test.json", "test", images_target_dir, annotations_target_dir, splits_target_dir, classes)
     
     print("\nQuá trình chuyển đổi định dạng hoàn tất thành công!")
     print(f"Dữ liệu VOC hiện được lưu tại: {voc_dir}")
