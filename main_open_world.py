@@ -26,6 +26,10 @@ from datasets.torchvision_datasets.open_world import OWDetection
 from engine import evaluate, train_one_epoch, viz
 from models import build_model
 
+# Đăng ký argparse.Namespace làm safe global để hỗ trợ torch.load trên PyTorch 2.6+
+if hasattr(torch, 'serialization') and hasattr(torch.serialization, 'add_safe_globals'):
+    torch.serialization.add_safe_globals([argparse.Namespace])
+
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Deformable DETR Detector', add_help=False)
