@@ -488,11 +488,11 @@ class SetCriterion(nn.Module):
                 unmatched_boxes = unmatched_boxes * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32).to(owod_device)
                 means_bb = torch.zeros(queries.shape[0]).to(unmatched_boxes)
                 bb = unmatched_boxes
+                upsaple = nn.Upsample(size=(img_h,img_w), mode='bilinear')
+                img_feat = upsaple(res_feat[i].unsqueeze(0).unsqueeze(0))
+                img_feat = img_feat.squeeze(0).squeeze(0)
                 for j, _ in enumerate(means_bb):
                     if j in unmatched_indices:
-                        upsaple = nn.Upsample(size=(img_h,img_w), mode='bilinear')
-                        img_feat = upsaple(res_feat[i].unsqueeze(0).unsqueeze(0))
-                        img_feat = img_feat.squeeze(0).squeeze(0)
                         xmin = bb[j,:][0].long()
                         ymin = bb[j,:][1].long()
                         xmax = bb[j,:][2].long()
@@ -553,12 +553,12 @@ class SetCriterion(nn.Module):
                         unmatched_boxes = unmatched_boxes * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32).to(owod_device)
                         means_bb = torch.zeros(queries.shape[0]).to(unmatched_boxes) #torch.zeros(unmatched_boxes.shape[0])
                         bb = unmatched_boxes
+                        upsaple = nn.Upsample(size=(img_h,img_w), mode='bilinear')
+                        img_feat = upsaple(res_feat[i].unsqueeze(0).unsqueeze(0))
+                        img_feat = img_feat.squeeze(0).squeeze(0)
                         ## [INFO]: iterating over the full list of boxes and then selecting the unmatched ones
                         for j, _ in enumerate(means_bb):
                             if j in unmatched_indices:
-                                upsaple = nn.Upsample(size=(img_h,img_w), mode='bilinear')
-                                img_feat = upsaple(res_feat[i].unsqueeze(0).unsqueeze(0))
-                                img_feat = img_feat.squeeze(0).squeeze(0)
                                 xmin = bb[j,:][0].long()
                                 ymin = bb[j,:][1].long()
                                 xmax = bb[j,:][2].long()
