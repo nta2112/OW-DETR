@@ -331,14 +331,24 @@ def main(args):
                 best_known_map = known_map
                 no_improvement_epochs = 0
             else:
-                required_val = best_known_map * min_delta_pct
-                if known_map > 0.0 and known_map >= required_val:
-                    print(f"-> Known mAP cải thiện vượt trội (Yêu cầu >= {required_val:.4f}%, Đạt: {known_map:.4f}%)")
+                # Nếu mAP còn nhỏ (< 1.0%), dùng độ tăng tuyệt đối (ít nhất 0.05% mAP) để tránh nhiễu ngẫu nhiên.
+                # Khi mAP đã lớn (>= 1.0%), yêu cầu độ tăng tương đối (3%).
+                if best_known_map < 1.0:
+                    is_improved = (known_map >= best_known_map + 0.05)
+                    improvement_detail = f"Đạt: {known_map:.4f}% >= Yêu cầu tăng tuyệt đối: {best_known_map + 0.05:.4f}%"
+                else:
+                    required_val = best_known_map * min_delta_pct
+                    is_improved = (known_map >= required_val)
+                    improvement_detail = f"Đạt: {known_map:.4f}% >= Yêu cầu tương đối: {required_val:.4f}%"
+
+                if known_map > 0.0 and is_improved:
+                    print(f"-> Known mAP cải thiện vượt trội ({improvement_detail})")
                     best_known_map = known_map
                     no_improvement_epochs = 0
                 else:
                     no_improvement_epochs += 1
-                    print(f"-> Không cải thiện vượt trội (Yêu cầu >= {required_val:.4f}%, Đạt: {known_map:.4f}%). Số epoch liên tiếp không cải thiện: {no_improvement_epochs}/{patience}")
+                    detail_req = f">= {best_known_map + 0.05:.4f}% (tuyệt đối)" if best_known_map < 1.0 else f">= {best_known_map * min_delta_pct:.4f}% (tương đối)"
+                    print(f"-> Không cải thiện vượt trội (Yêu cầu {detail_req}, Đạt: {known_map:.4f}%). Số epoch liên tiếp không cải thiện: {no_improvement_epochs}/{patience}")
                     if no_improvement_epochs >= patience:
                         print("Early stopping triggered. Huấn luyện dừng lại do Known mAP không cải thiện sau 2 epoch liên tiếp.")
                         break
