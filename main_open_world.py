@@ -134,6 +134,7 @@ def get_args_parser():
     parser.add_argument('--dataset', default='owod')
     parser.add_argument('--data_root', default='../data/OWDETR', type=str)
     parser.add_argument('--bbox_thresh', default=0.3, type=float)
+    parser.add_argument('--filter_pct', default=-1.0, type=float, help='percentage of data to keep')
     return parser
 
 def main(args):
@@ -375,7 +376,7 @@ def get_datasets(args):
         train_set = args.train_set
         val_set = args.val_set
         test_set = args.test_set
-        dataset_train = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.train_set], transforms=make_coco_transforms(args.train_set))
+        dataset_train = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.train_set], transforms=make_coco_transforms(args.train_set), filter_pct=args.filter_pct)
         dataset_val = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.val_set], transforms=make_coco_transforms(args.val_set))
     else:
         raise ValueError("Wrong dataset name")
