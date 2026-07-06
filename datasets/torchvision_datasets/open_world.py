@@ -142,7 +142,8 @@ class OWDetection(VisionDataset):
 
         if filter_pct > 0:
             num_keep = float(len(self.imgids)) * filter_pct
-            keep = np.random.choice(np.arange(len(self.imgids)), size=round(num_keep), replace=False).tolist()
+            rng = np.random.RandomState(42)
+            keep = rng.choice(np.arange(len(self.imgids)), size=round(num_keep), replace=False).tolist()
             flt = lambda l: [l[i] for i in keep]
             self.image_set, self.images, self.annotations, self.imgids = map(flt, [self.image_set, self.images,
                                                                                    self.annotations, self.imgids])
