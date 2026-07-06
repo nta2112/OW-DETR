@@ -123,6 +123,7 @@ def get_args_parser():
     parser.add_argument('--featdim', default=1024, type=int)
     parser.add_argument('--pretrain', default='', help='initialized from the pre-training model')
     parser.add_argument('--train_set', default='', help='training txt files')
+    parser.add_argument('--val_set', default='val', help='validation txt files')
     parser.add_argument('--test_set', default='', help='testing txt files')
     parser.add_argument('--NC_branch', default=False, action='store_true')
     parser.add_argument('--nc_loss_coef', default=2, type=float)
@@ -137,6 +138,8 @@ def get_args_parser():
 
 def main(args):
     utils.init_distributed_mode(args)
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
     print("git:\n  {}\n".format(utils.get_sha()))
 
     if args.frozen_weights is not None:
@@ -284,13 +287,23 @@ def main(args):
         viz(model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir)
         return
 
+    # Khởi tạo PyTorch AMP GradScaler cho huấn luyện tốc độ cao FP16
+    scaler = torch.cuda.amp.GradScaler() if args.device == 'cuda' else None
+
+    # Cấu hình Early Stopping
+    best_known_map = -1.0
+    no_improvement_epochs = 0
+    patience = 2
+    min_delta_pct = 1.05
+
     print("Start training")
     start_time = time.time()
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(
-            model, criterion, data_loader_train, optimizer, device, epoch, args.nc_epoch, args.clip_max_norm)
+            model, criterion, data_loader_train, optimizer, device, epoch, args.nc_epoch, args.clip_max_norm,
+            scaler=scaler)
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
@@ -306,10 +319,32 @@ def main(args):
                     'args': args,
                 }, checkpoint_path)
 
-        if args.dataset in ['owod'] and epoch % args.eval_every == 0 and epoch > 0:
+        # Chạy validation sau mỗi 1 epoch
+        if args.dataset in ['owod']:
             test_stats, coco_evaluator = evaluate(
                 model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir, args
             )
+            
+            # Tính Known mAP
+            num_known_classes = args.PREV_INTRODUCED_CLS + args.CUR_INTRODUCED_CLS
+            known_map = float(coco_evaluator.AP[:num_known_classes].mean())
+            print(f"Epoch {epoch} - Known mAP: {known_map:.4f}% (Best: {max(0.0, best_known_map):.4f}%)")
+            
+            if best_known_map < 0:
+                best_known_map = known_map
+                no_improvement_epochs = 0
+            else:
+                required_val = best_known_map * min_delta_pct
+                if known_map > 0.0 and known_map >= required_val:
+                    print(f"-> Known mAP cải thiện vượt trội (Yêu cầu >= {required_val:.4f}%, Đạt: {known_map:.4f}%)")
+                    best_known_map = known_map
+                    no_improvement_epochs = 0
+                else:
+                    no_improvement_epochs += 1
+                    print(f"-> Không cải thiện vượt trội (Yêu cầu >= {required_val:.4f}%, Đạt: {known_map:.4f}%). Số epoch liên tiếp không cải thiện: {no_improvement_epochs}/{patience}")
+                    if no_improvement_epochs >= patience:
+                        print("Early stopping triggered. Huấn luyện dừng lại do Known mAP không cải thiện sau 2 epoch liên tiếp.")
+                        break
         else:
             test_stats = {}
 
@@ -342,14 +377,16 @@ def get_datasets(args):
     print(args.dataset)
     if args.dataset == 'owod':
         train_set = args.train_set
+        val_set = args.val_set
         test_set = args.test_set
         dataset_train = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.train_set], transforms=make_coco_transforms(args.train_set))
-        dataset_val = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.test_set], transforms=make_coco_transforms(args.test_set))
+        dataset_val = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.val_set], transforms=make_coco_transforms(args.val_set))
     else:
         raise ValueError("Wrong dataset name")
 
     print(args.dataset)
     print(args.train_set)
+    print(args.val_set)
     print(args.test_set)
     print(dataset_train)
     print(dataset_val)

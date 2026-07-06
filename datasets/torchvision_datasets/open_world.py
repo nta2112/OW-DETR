@@ -240,7 +240,7 @@ class OWDetection(VisionDataset):
         target, instances = self.load_instances(self.imgids[index])
         if 'train' in image_set:
             instances = self.remove_prev_class_and_unk_instances(instances)
-        elif 'test' in image_set:
+        elif 'test' in image_set or 'val' in image_set:
             instances = self.label_known_class_and_unknown(instances)
         elif 'ft' in image_set:
             instances = self.remove_unknown_instances(instances)

@@ -36,6 +36,19 @@ def process_split(coco_dir, img_dir, output_dir, json_name, split_name, images_t
             
             # 1. Copy/Link ảnh
             src_image_path = os.path.join(img_dir, file_name)
+            
+            # Thử thêm prefix của split_name (ví dụ: val/, train/, test/) nếu file_name trong json không chứa
+            if not os.path.exists(src_image_path):
+                src_image_path = os.path.join(img_dir, split_name, file_name)
+                
+            # Thử tìm kiếm file trực tiếp dưới thư mục split_name
+            if not os.path.exists(src_image_path):
+                src_image_path = os.path.join(img_dir, split_name, os.path.basename(file_name))
+                
+            # Thử tìm kiếm tương đối bằng tên file gốc trực tiếp dưới img_dir
+            if not os.path.exists(src_image_path):
+                src_image_path = os.path.join(img_dir, os.path.basename(file_name))
+                
             dst_image_path = os.path.join(images_target_dir, f"{formatted_name}.jpg")
             
             if os.path.exists(src_image_path):
@@ -47,17 +60,8 @@ def process_split(coco_dir, img_dir, output_dir, json_name, split_name, images_t
                     except Exception:
                         shutil.copy(src_image_path, dst_image_path)
             else:
-                # Tìm kiếm tương đối nếu file_name có đường dẫn khác
-                alternative_path = os.path.join(img_dir, os.path.basename(file_name))
-                if os.path.exists(alternative_path):
-                    if not os.path.exists(dst_image_path):
-                        try:
-                            os.symlink(alternative_path, dst_image_path)
-                        except Exception:
-                            shutil.copy(alternative_path, dst_image_path)
-                else:
-                    print(f"Cảnh báo: Không tìm thấy ảnh nguồn tại {src_image_path} hoặc {alternative_path}")
-                    continue
+                print(f"Cảnh báo: Không tìm thấy ảnh nguồn cho {file_name} (Thử mọi đường dẫn đều thất bại)")
+                continue
                 
             # 2. Tạo file nhãn XML (Pascal VOC format)
             annotation_el = ET.Element('annotation')

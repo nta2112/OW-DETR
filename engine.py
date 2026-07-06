@@ -28,7 +28,8 @@ from copy import deepcopy
  
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, nc_epoch: int, max_norm: float = 0):
+                    device: torch.device, epoch: int, nc_epoch: int, max_norm: float = 0,
+                    scaler=None):
     model.train()
     criterion.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -40,17 +41,44 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     prefetcher = data_prefetcher(data_loader, device, prefetch=True)
     samples, targets = prefetcher.next()
     for _ in metric_logger.log_every(range(len(data_loader)), print_freq, header):
-        outputs = model(samples)
-        loss_dict = criterion(samples, outputs, targets, epoch) ## samples variable needed for feature selection
-        weight_dict = deepcopy(criterion.weight_dict)
-        ## condition for starting nc loss computation after certain epoch so that the F_cls branch has the time
-        ## to learn the within classes seperation.
-        if epoch < nc_epoch: 
-            for k,v in weight_dict.items():
-                if 'NC' in k:
-                    weight_dict[k] = 0
-         
-        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+        optimizer.zero_grad()
+        if scaler is not None:
+            with torch.cuda.amp.autocast():
+                outputs = model(samples)
+                loss_dict = criterion(samples, outputs, targets, epoch) ## samples variable needed for feature selection
+                weight_dict = deepcopy(criterion.weight_dict)
+                ## condition for starting nc loss computation after certain epoch so that the F_cls branch has the time
+                ## to learn the within classes seperation.
+                if epoch < nc_epoch: 
+                    for k,v in weight_dict.items():
+                        if 'NC' in k:
+                            weight_dict[k] = 0
+                losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+            scaler.scale(losses).backward()
+            if max_norm > 0:
+                scaler.unscale_(optimizer)
+                grad_total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            else:
+                scaler.unscale_(optimizer)
+                grad_total_norm = utils.get_total_grad_norm(model.parameters(), max_norm)
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            outputs = model(samples)
+            loss_dict = criterion(samples, outputs, targets, epoch)
+            weight_dict = deepcopy(criterion.weight_dict)
+            if epoch < nc_epoch: 
+                for k,v in weight_dict.items():
+                    if 'NC' in k:
+                        weight_dict[k] = 0
+            losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+            losses.backward()
+            if max_norm > 0:
+                grad_total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
+            else:
+                grad_total_norm = utils.get_total_grad_norm(model.parameters(), max_norm)
+            optimizer.step()
+
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
         ## Just printing NOt affectin gin loss function
@@ -66,14 +94,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
             print("Loss is {}, stopping training".format(loss_value))
             print(loss_dict_reduced)
             sys.exit(1)
- 
-        optimizer.zero_grad()
-        losses.backward()
-        if max_norm > 0:
-            grad_total_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-        else:
-            grad_total_norm = utils.get_total_grad_norm(model.parameters(), max_norm)
-        optimizer.step()
  
         metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
@@ -107,7 +127,8 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
     for samples, targets in metric_logger.log_every(data_loader, 10, header):
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        outputs = model(samples)
+        with torch.cuda.amp.autocast():
+            outputs = model(samples)
 
         orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
         results = postprocessors['bbox'](outputs, orig_target_sizes)
