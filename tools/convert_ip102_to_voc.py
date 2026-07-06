@@ -53,12 +53,9 @@ def process_split(coco_dir, img_dir, output_dir, json_name, split_name, images_t
             
             if os.path.exists(src_image_path):
                 if not os.path.exists(dst_image_path):
-                    # Sử dụng symlink nếu chạy trên Linux/Kaggle để tiết kiệm dung lượng và thời gian, 
-                    # nếu lỗi thì copy
-                    try:
-                        os.symlink(src_image_path, dst_image_path)
-                    except Exception:
-                        shutil.copy(src_image_path, dst_image_path)
+                    # Sao chép trực tiếp tệp ảnh sang ổ cứng SSD cục bộ (/kaggle/working)
+                    # để tránh nghẽn cổ chai IO mạng khi đọc ảnh qua symlink từ /kaggle/input
+                    shutil.copy(src_image_path, dst_image_path)
             else:
                 print(f"Cảnh báo: Không tìm thấy ảnh nguồn cho {file_name} (Thử mọi đường dẫn đều thất bại)")
                 continue
