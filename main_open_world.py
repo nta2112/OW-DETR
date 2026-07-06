@@ -377,7 +377,7 @@ def get_datasets(args):
         val_set = args.val_set
         test_set = args.test_set
         dataset_train = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.train_set], transforms=make_coco_transforms(args.train_set), filter_pct=args.filter_pct)
-        dataset_val = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.val_set], transforms=make_coco_transforms(args.val_set))
+        dataset_val = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.val_set], transforms=make_coco_transforms(args.val_set), filter_pct=0.5)
     else:
         raise ValueError("Wrong dataset name")
 
