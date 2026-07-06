@@ -287,9 +287,6 @@ def main(args):
         viz(model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir)
         return
 
-    # Khởi tạo PyTorch AMP GradScaler cho huấn luyện tốc độ cao FP16
-    scaler = torch.cuda.amp.GradScaler() if args.device == 'cuda' else None
-
     # Cấu hình Early Stopping
     best_known_map = -1.0
     no_improvement_epochs = 0
@@ -302,8 +299,7 @@ def main(args):
         if args.distributed:
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(
-            model, criterion, data_loader_train, optimizer, device, epoch, args.nc_epoch, args.clip_max_norm,
-            scaler=scaler)
+            model, criterion, data_loader_train, optimizer, device, epoch, args.nc_epoch, args.clip_max_norm)
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
