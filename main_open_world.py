@@ -292,7 +292,7 @@ def main(args):
     best_known_map = -1.0
     no_improvement_epochs = 0
     patience = 2
-    min_delta_pct = 1.05
+    min_delta_pct = 1.03
 
     print("Start training")
     start_time = time.time()
