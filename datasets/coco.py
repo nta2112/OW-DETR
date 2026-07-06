@@ -129,21 +129,14 @@ def make_coco_transforms(image_set):
         T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
 
-    scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
+    scales = [224]
     t=[]
     
     if 'train' in image_set:
         t.append(['train'])
         t.append(T.Compose([
             T.RandomHorizontalFlip(),
-            T.RandomSelect(
-                T.RandomResize(scales, max_size=1333),
-                T.Compose([
-                    T.RandomResize([400, 500, 600]),
-                    T.RandomSizeCrop(384, 600),
-                    T.RandomResize(scales, max_size=1333),
-                ])
-            ),
+            T.RandomResize(scales, max_size=224),
             normalize,
         ]))
         return t
@@ -152,14 +145,7 @@ def make_coco_transforms(image_set):
         t.append(['ft'])
         t.append(T.Compose([
             T.RandomHorizontalFlip(),
-            T.RandomSelect(
-                T.RandomResize(scales, max_size=1333),
-                T.Compose([
-                    T.RandomResize([400, 500, 600]),
-                    T.RandomSizeCrop(384, 600),
-                    T.RandomResize(scales, max_size=1333),
-                ])
-            ),
+            T.RandomResize(scales, max_size=224),
             normalize,
         ]))
         return t
@@ -167,7 +153,7 @@ def make_coco_transforms(image_set):
     if 'val' in image_set:
         t.append(['val'])
         t.append(T.Compose([
-            T.RandomResize([800], max_size=1333),
+            T.RandomResize([224], max_size=224),
             normalize,
         ]))
         return t
@@ -175,7 +161,7 @@ def make_coco_transforms(image_set):
     if 'test' in image_set:
         t.append(['test'])
         t.append(T.Compose([
-            T.RandomResize([800], max_size=1333),
+            T.RandomResize([224], max_size=224),
             normalize,
         ]))
         return t
