@@ -305,6 +305,8 @@ def main(args):
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
+            if args.epochs == 1:
+                checkpoint_paths.append(output_dir / 'best_checkpoint.pth')
             # extra checkpoint before LR drop and every 5 epochs
             if (epoch + 1) % args.lr_drop == 0 or (epoch + 1) % 5 == 0:
                 checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
@@ -317,8 +319,8 @@ def main(args):
                     'args': args,
                 }, checkpoint_path)
 
-        # Chạy validation sau mỗi 1 epoch
-        if args.dataset in ['owod']:
+        # Chạy validation sau mỗi 1 epoch (Bỏ qua nếu chỉ chạy 1 epoch trong quá trình train)
+        if args.dataset in ['owod'] and not (args.epochs == 1 and not args.eval):
             test_stats, coco_evaluator = evaluate(
                 model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir, args
             )
