@@ -232,17 +232,19 @@ def main(args):
 
     if args.frozen_weights is not None:
         checkpoint = torch.load(args.frozen_weights, map_location='cpu')
-        model_without_ddp.detr.load_state_dict(checkpoint['model'])
+        frozen_state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+        model_without_ddp.detr.load_state_dict(frozen_state_dict)
 
     output_dir = Path(args.output_dir)
 
     if args.pretrain:
         print('Initialized from the pre-training model')
         checkpoint = torch.load(args.pretrain, map_location='cpu')
-        state_dict = checkpoint['model']
+        state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
         msg = model_without_ddp.load_state_dict(state_dict, strict=False)
         print(msg)
-        args.start_epoch = checkpoint['epoch'] + 1
+        if 'epoch' in checkpoint:
+            args.start_epoch = checkpoint['epoch'] + 1
 
     if args.resume:
         if args.resume.startswith('https'):
@@ -250,7 +252,8 @@ def main(args):
                 args.resume, map_location='cpu', check_hash=True)
         else:
             checkpoint = torch.load(args.resume, map_location='cpu')
-        missing_keys, unexpected_keys = model_without_ddp.load_state_dict(checkpoint['model'], strict=False)
+        resume_state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
+        missing_keys, unexpected_keys = model_without_ddp.load_state_dict(resume_state_dict, strict=False)
         unexpected_keys = [k for k in unexpected_keys if not (k.endswith('total_params') or k.endswith('total_ops'))]
         if len(missing_keys) > 0:
             print('Missing Keys: {}'.format(missing_keys))
