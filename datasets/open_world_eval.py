@@ -172,18 +172,18 @@ class OWEvaluator:
         if self.prev_intro_cls > 0:
             print("Prev class AP50: " + str(self.AP[:, o50][:self.prev_intro_cls].mean().item()))
             print("Prev class mAP: " + str(float(self.AP[:self.prev_intro_cls].mean())))
-            print("Prev class Precisions50: " + str(np.mean(self.precs[50][:self.prev_intro_cls])))
-            print("Prev class Recall50: " + str(np.mean(self.recs[50][:self.prev_intro_cls])))
+            print("Prev class Precisions50: " + str(np.nanmean(self.precs[50][:self.prev_intro_cls])))
+            print("Prev class Recall50: " + str(np.nanmean(self.recs[50][:self.prev_intro_cls])))
 
         print("Current class AP50: " + str(self.AP[:, o50][self.prev_intro_cls:self.prev_intro_cls + self.curr_intro_cls].mean().item()))
         print("Current class mAP: " + str(float(self.AP[self.prev_intro_cls:self.prev_intro_cls + self.curr_intro_cls].mean())))
-        print("Current class Precisions50: " + str(np.mean(self.precs[50][self.prev_intro_cls:self.prev_intro_cls + self.curr_intro_cls])))
-        print("Current class Recall50: " + str(np.mean(self.recs[50][self.prev_intro_cls:self.prev_intro_cls + self.curr_intro_cls])))
+        print("Current class Precisions50: " + str(np.nanmean(self.precs[50][self.prev_intro_cls:self.prev_intro_cls + self.curr_intro_cls])))
+        print("Current class Recall50: " + str(np.nanmean(self.recs[50][self.prev_intro_cls:self.prev_intro_cls + self.curr_intro_cls])))
 
         print("Known AP50: " + str(self.AP[:, o50][:self.prev_intro_cls + self.curr_intro_cls].mean().item()))
         print("Known mAP: " + str(float(self.AP[:self.prev_intro_cls + self.curr_intro_cls].mean())))
-        print("Known Precisions50: " + str(np.mean(self.precs[50][:self.prev_intro_cls + self.curr_intro_cls])))
-        print("Known Recall50: " + str(np.mean(self.recs[50][:self.prev_intro_cls + self.curr_intro_cls])))
+        print("Known Precisions50: " + str(np.nanmean(self.precs[50][:self.prev_intro_cls + self.curr_intro_cls])))
+        print("Known Recall50: " + str(np.nanmean(self.recs[50][:self.prev_intro_cls + self.curr_intro_cls])))
 
         print("Unknown AP50: " + str(self.AP[:, o50][-1].item()))
         print("Unknown mAP: " + str(float(self.AP[-1].mean())))
