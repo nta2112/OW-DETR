@@ -243,8 +243,6 @@ def main(args):
         state_dict = checkpoint['model'] if 'model' in checkpoint else checkpoint
         msg = model_without_ddp.load_state_dict(state_dict, strict=False)
         print(msg)
-        if 'epoch' in checkpoint:
-            args.start_epoch = checkpoint['epoch'] + 1
 
     if args.resume:
         if args.resume.startswith('https'):
