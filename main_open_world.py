@@ -330,6 +330,15 @@ def main(args):
             if best_known_map < 0:
                 best_known_map = known_map
                 no_improvement_epochs = 0
+                if args.output_dir and known_map > 0.0:
+                    print("Lưu checkpoint tốt nhất khởi tạo (best_checkpoint.pth)...")
+                    utils.save_on_master({
+                        'model': model_without_ddp.state_dict(),
+                        'optimizer': optimizer.state_dict(),
+                        'lr_scheduler': lr_scheduler.state_dict(),
+                        'epoch': epoch,
+                        'args': args,
+                    }, output_dir / 'best_checkpoint.pth')
             else:
                 # Nếu mAP còn nhỏ (< 1.0%), dùng độ tăng tuyệt đối (ít nhất 0.05% mAP) để tránh nhiễu ngẫu nhiên.
                 # Khi mAP đã lớn (>= 1.0%), yêu cầu độ tăng tương đối (3%).
@@ -345,6 +354,15 @@ def main(args):
                     print(f"-> Known mAP cải thiện vượt trội ({improvement_detail})")
                     best_known_map = known_map
                     no_improvement_epochs = 0
+                    if args.output_dir:
+                        print("Lưu checkpoint tốt nhất mới (best_checkpoint.pth)...")
+                        utils.save_on_master({
+                            'model': model_without_ddp.state_dict(),
+                            'optimizer': optimizer.state_dict(),
+                            'lr_scheduler': lr_scheduler.state_dict(),
+                            'epoch': epoch,
+                            'args': args,
+                        }, output_dir / 'best_checkpoint.pth')
                 else:
                     no_improvement_epochs += 1
                     detail_req = f">= {best_known_map + 0.05:.4f}% (tuyệt đối)" if best_known_map < 1.0 else f">= {best_known_map * min_delta_pct:.4f}% (tương đối)"
