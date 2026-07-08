@@ -612,6 +612,9 @@ class SetCriterion(nn.Module):
 
 class PostProcess(nn.Module):
     """ This module converts the model's output into the format expected by the coco api"""
+    def __init__(self, invalid_cls_logits=None):
+        super().__init__()
+        self.invalid_cls_logits = invalid_cls_logits
 
     @torch.no_grad()
     def forward(self, outputs, target_sizes):
@@ -623,6 +626,9 @@ class PostProcess(nn.Module):
                           For visualization, this should be the image size after data augment, but before padding
         """
         out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
+        if self.invalid_cls_logits is not None:
+            out_logits = out_logits.clone()
+            out_logits[:, :, self.invalid_cls_logits] = -10e10
 
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
@@ -716,7 +722,7 @@ def build(args):
         losses += ["masks"]
     criterion = SetCriterion(args, num_classes, matcher, weight_dict, losses, invalid_cls_logits, focal_alpha=args.focal_alpha)
     criterion.to(device)
-    postprocessors = {'bbox': PostProcess()}
+    postprocessors = {'bbox': PostProcess(invalid_cls_logits=invalid_cls_logits)}
     if args.masks:
         postprocessors['segm'] = PostProcessSegm()
         if args.dataset == "coco_panoptic":
