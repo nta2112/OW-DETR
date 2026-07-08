@@ -397,6 +397,15 @@ def main(args):
                             torch.save(coco_evaluator.coco_eval["bbox"].eval,
                                     output_dir / "eval" / name)
 
+    if args.output_dir and utils.is_main_process():
+        best_ckpt_path = output_dir / 'best_checkpoint.pth'
+        if not best_ckpt_path.exists():
+            ckpt_path = output_dir / 'checkpoint.pth'
+            if ckpt_path.exists():
+                import shutil
+                shutil.copy(ckpt_path, best_ckpt_path)
+                print(f"Copying final checkpoint {ckpt_path} to {best_ckpt_path} as fallback.")
+
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     print('Training time {}'.format(total_time_str))
