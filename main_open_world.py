@@ -244,6 +244,19 @@ def main(args):
         msg = model_without_ddp.load_state_dict(state_dict, strict=False)
         print(msg)
 
+        if args.PREV_INTRODUCED_CLS > 0:
+            print(f"Re-initializing class_embed weights and biases for classes {args.PREV_INTRODUCED_CLS} to {args.num_classes - 2}")
+            prior_prob = 0.01
+            bias_value = -math.log((1 - prior_prob) / prior_prob)
+            with torch.no_grad():
+                for embed in model_without_ddp.class_embed:
+                    # Reset bias for classes from PREV_INTRODUCED_CLS to num_classes - 2
+                    embed.bias[args.PREV_INTRODUCED_CLS : args.num_classes - 1].fill_(bias_value)
+                    # Reset weight for classes from PREV_INTRODUCED_CLS to num_classes - 2
+                    fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(embed.weight)
+                    bound = 1 / math.sqrt(fan_in) if fan_in > 0 else 0
+                    torch.nn.init.uniform_(embed.weight[args.PREV_INTRODUCED_CLS : args.num_classes - 1], -bound, bound)
+
     if args.resume:
         if args.resume.startswith('https'):
             checkpoint = torch.hub.load_state_dict_from_url(
