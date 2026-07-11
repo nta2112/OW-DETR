@@ -246,6 +246,7 @@ def main(args):
 
         if args.PREV_INTRODUCED_CLS > 0:
             print(f"Re-initializing class_embed weights and biases for classes {args.PREV_INTRODUCED_CLS} to {args.num_classes - 2}")
+            import math
             prior_prob = 0.01
             bias_value = -math.log((1 - prior_prob) / prior_prob)
             with torch.no_grad():
