@@ -163,18 +163,21 @@ def main(args):
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
 
-    dataset_train, dataset_val = get_datasets(args)
+    dataset_train, dataset_val, dataset_test = get_datasets(args)
     
     if args.distributed:
         if args.cache_mode:
             sampler_train = samplers.NodeDistributedSampler(dataset_train)
             sampler_val = samplers.NodeDistributedSampler(dataset_val, shuffle=False)
+            sampler_test = samplers.NodeDistributedSampler(dataset_test, shuffle=False)
         else:
             sampler_train = samplers.DistributedSampler(dataset_train)
             sampler_val = samplers.DistributedSampler(dataset_val, shuffle=False)
+            sampler_test = samplers.DistributedSampler(dataset_test, shuffle=False)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+        sampler_test = torch.utils.data.SequentialSampler(dataset_test)
 
     batch_sampler_train = torch.utils.data.BatchSampler(sampler_train, args.batch_size, drop_last=True)
     data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
@@ -183,6 +186,9 @@ def main(args):
     data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
                                  drop_last=False, collate_fn=utils.collate_fn, num_workers=args.num_workers,
                                  pin_memory=True)
+    data_loader_test = DataLoader(dataset_test, args.batch_size, sampler=sampler_test,
+                                  drop_last=False, collate_fn=utils.collate_fn, num_workers=args.num_workers,
+                                  pin_memory=True)
 
     # lr_backbone_names = ["backbone.0", "backbone.neck", "input_proj", "transformer.encoder"]
     def match_name_keywords(n, name_keywords):
@@ -294,13 +300,13 @@ def main(args):
                 model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir, args
             )
         if args.eval:
-            test_stats, coco_evaluator = evaluate(model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir, args)
+            test_stats, coco_evaluator = evaluate(model, criterion, postprocessors, data_loader_test, base_ds, device, args.output_dir, args)
             if args.output_dir:
                 utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
             return
 
     if args.viz:
-        viz(model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir)
+        viz(model, criterion, postprocessors, data_loader_test if args.eval else data_loader_val, base_ds, device, args.output_dir)
         return
 
     # Cấu hình Early Stopping
@@ -432,6 +438,7 @@ def get_datasets(args):
         test_set = args.test_set
         dataset_train = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.train_set], transforms=make_coco_transforms(args.train_set), filter_pct=args.filter_pct)
         dataset_val = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.val_set], transforms=make_coco_transforms(args.val_set), filter_pct=0.5)
+        dataset_test = OWDetection(args, args.owod_path, ["2007"], image_sets=[args.test_set], transforms=make_coco_transforms(args.test_set), filter_pct=0.5)
     else:
         raise ValueError("Wrong dataset name")
 
@@ -441,8 +448,9 @@ def get_datasets(args):
     print(args.test_set)
     print(dataset_train)
     print(dataset_val)
+    print(dataset_test)
 
-    return dataset_train, dataset_val
+    return dataset_train, dataset_val, dataset_test
 
 
 def set_dataset_path(args):
