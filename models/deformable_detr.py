@@ -612,9 +612,10 @@ class SetCriterion(nn.Module):
 
 class PostProcess(nn.Module):
     """ This module converts the model's output into the format expected by the coco api"""
-    def __init__(self, invalid_cls_logits=None):
+    def __init__(self, invalid_cls_logits=None, NC_branch=False):
         super().__init__()
         self.invalid_cls_logits = invalid_cls_logits
+        self.NC_branch = NC_branch
 
     @torch.no_grad()
     def forward(self, outputs, target_sizes):
@@ -629,6 +630,10 @@ class PostProcess(nn.Module):
         if self.invalid_cls_logits is not None:
             out_logits = out_logits.clone()
             out_logits[:, :, self.invalid_cls_logits] = -10e10
+
+        if self.NC_branch and 'pred_nc_logits' in outputs:
+            out_logits = out_logits.clone()
+            out_logits[:, :, -1] = outputs['pred_nc_logits'].squeeze(-1)
 
         assert len(out_logits) == len(target_sizes)
         assert target_sizes.shape[1] == 2
@@ -722,7 +727,7 @@ def build(args):
         losses += ["masks"]
     criterion = SetCriterion(args, num_classes, matcher, weight_dict, losses, invalid_cls_logits, focal_alpha=args.focal_alpha)
     criterion.to(device)
-    postprocessors = {'bbox': PostProcess(invalid_cls_logits=invalid_cls_logits)}
+    postprocessors = {'bbox': PostProcess(invalid_cls_logits=invalid_cls_logits, NC_branch=args.NC_branch)}
     if args.masks:
         postprocessors['segm'] = PostProcessSegm()
         if args.dataset == "coco_panoptic":
