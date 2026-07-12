@@ -457,7 +457,7 @@ class SetCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied, see each loss' doc
         """
         if self.nc_epoch > 0:
-            loss_epoch = 9
+            loss_epoch = self.nc_epoch
         else:
             loss_epoch = 0
 
