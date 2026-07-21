@@ -4,58 +4,45 @@ from pycocotools.coco import COCO
 
 def prepare_splits(
     coco_json_path="/kaggle/input/datasets/nta212/ip102-for-object-detection/train.json",
+    voc_img_dir="/kaggle/input/datasets/nta212/ip102-for-object-detection/VOC2007/VOC2007/JPEGImages",
     output_dir="data/IP102/VOC2007/ImageSets/Main",
     num_exemplars_per_class=20
 ):
     """
     Chuẩn bị dữ liệu ImageSets cho IP102 dataset (25 lớp, chia làm 4 task):
-    - Tự động tách mã lớp ghép ở đầu để biến 15001536 / 24002179 thành 001536 / 002179.
+    - Sử dụng chính xác đường dẫn VOC2007/VOC2007/JPEGImages chứa các file IP000000000.jpg
     """
     print(f"Đang đọc file annotations: {coco_json_path}")
     coco = COCO(coco_json_path)
 
-    # Thử tìm thư mục ảnh JPEGImages ở nhiều đường dẫn Kaggle khác nhau
-    possible_img_dirs = [
-        "/kaggle/input/datasets/nta212/ip102-for-object-detection/VOC2007/JPEGImages",
-        "/kaggle/input/ip102-for-object-detection/VOC2007/JPEGImages",
-        "data/IP102/VOC2007/JPEGImages",
-    ]
-    
+    # Đọc danh sách file ảnh thực tế từ thư mục gốc VOC2007/VOC2007/JPEGImages
     existing_stems = set()
-    found_dir = None
-    for img_dir in possible_img_dirs:
-        if os.path.exists(img_dir):
-            found_dir = img_dir
-            for f in os.listdir(img_dir):
-                if f.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    existing_stems.add(os.path.splitext(f)[0])
-            print(f"✓ Đã quét {len(existing_stems)} file ảnh thực tế từ: {found_dir}")
-            break
+    if os.path.exists(voc_img_dir):
+        for f in os.listdir(voc_img_dir):
+            if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                existing_stems.add(os.path.splitext(f)[0])
+        print(f"✓ Đã quét thành công {len(existing_stems)} file ảnh thực tế từ: {voc_img_dir}")
+    else:
+        print(f"⚠️ Thư mục ảnh {voc_img_dir} chưa sẵn sàng, sẽ trích xuất từ file_name trong COCO JSON.")
 
     def get_valid_stem(img_id):
         img_info = coco.imgs.get(img_id, {})
         file_name = img_info.get("file_name", "")
         fn_stem = os.path.splitext(os.path.basename(file_name))[0] if file_name else ""
+
+        if fn_stem and (not existing_stems or fn_stem in existing_stems):
+            return fn_stem
         
-        candidates = []
+        candidates = [fn_stem] if fn_stem else []
         if str(img_id).isdigit():
             val = int(img_id)
-            # Dùng % 1000000 để loại bỏ prefix ID lớp (ví dụ 15001536 -> 1536 -> 001536)
             short_val = val % 1000000
-            candidates.append(f"{short_val:06d}")
-            candidates.append(f"{val:06d}")
-            candidates.append(str(val))
-        if fn_stem:
-            candidates.append(fn_stem)
+            candidates.extend([f"{short_val:06d}", f"{val:06d}", str(val)])
 
-        # Nếu tìm thấy danh sách ảnh thực tế trên đĩa
-        if existing_stems:
-            for cand in candidates:
-                if cand in existing_stems:
-                    return cand
-
-        # Mặc định chuẩn hóa an toàn là 6 chữ số số nguyên
-        return candidates[0] if candidates else str(img_id)
+        for cand in candidates:
+            if cand in existing_stems:
+                return cand
+        return fn_stem if fn_stem else str(img_id)
 
     # Ánh xạ danh sách categories được sắp xếp theo ID sang chỉ số 0..24
     cats = sorted(coco.loadCats(coco.getCatIds()), key=lambda c: c['id'])
