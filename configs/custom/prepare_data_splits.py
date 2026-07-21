@@ -4,18 +4,46 @@ from pycocotools.coco import COCO
 
 def prepare_splits(
     coco_json_path="/kaggle/input/datasets/nta212/ip102-for-object-detection/train.json",
+    voc_img_dir="/kaggle/input/datasets/nta212/ip102-for-object-detection/VOC2007/JPEGImages",
     output_dir="data/IP102/VOC2007/ImageSets/Main",
     num_exemplars_per_class=20
 ):
     """
     Chuẩn bị dữ liệu ImageSets cho IP102 dataset (25 lớp, chia làm 4 task):
-    - Task 1: 7 lớp (chỉ số 0..6)
-    - Task 2: 6 lớp (chỉ số 7..12)
-    - Task 3: 6 lớp (chỉ số 13..18)
-    - Task 4: 6 lớp (chỉ số 19..24)
+    - Tự động kiểm tra file ảnh thực tế trên đĩa để tránh lỗi FileNotFoundError.
     """
     print(f"Đang đọc file annotations: {coco_json_path}")
     coco = COCO(coco_json_path)
+
+    # Đọc danh sách file ảnh thực tế đang có trên đĩa Kaggle để đối chiếu 100%
+    existing_stems = set()
+    if os.path.exists(voc_img_dir):
+        for f in os.listdir(voc_img_dir):
+            if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                existing_stems.add(os.path.splitext(f)[0])
+        print(f"✓ Đã quét {len(existing_stems)} file ảnh thực tế trong {voc_img_dir}")
+    else:
+        print(f"⚠️ Thư mục ảnh {voc_img_dir} chưa sẵn sàng, sẽ dùng fallback format.")
+
+    def get_valid_stem(img_id):
+        img_info = coco.imgs.get(img_id, {})
+        file_name = img_info.get("file_name", "")
+        fn_stem = os.path.splitext(os.path.basename(file_name))[0] if file_name else ""
+        
+        # Danh sách các ứng viên tên file
+        candidates = []
+        if str(img_id).isdigit():
+            val = int(img_id)
+            candidates.append(f"{val:06d}")
+            candidates.append(f"{val % 1000000:06d}")
+            candidates.append(str(val))
+        if fn_stem:
+            candidates.append(fn_stem)
+
+        for cand in candidates:
+            if cand in existing_stems:
+                return cand
+        return candidates[0] if candidates else str(img_id)
 
     # Ánh xạ danh sách categories được sắp xếp theo ID sang chỉ số 0..24
     cats = sorted(coco.loadCats(coco.getCatIds()), key=lambda c: c['id'])
@@ -37,7 +65,6 @@ def prepare_splits(
                 task_img_ids.add(ann['image_id'])
         train_images[task_name] = sorted(list(task_img_ids))
 
-    # Hàm lấy mẫu đại diện (exemplars) từ các lớp cũ để finetuning
     def get_exemplars(cat_ids_set, num_images_per_class=num_exemplars_per_class):
         exemplar_ids = set()
         for cid in cat_ids_set:
@@ -70,12 +97,11 @@ def prepare_splits(
 
     for name, img_ids in splits.items():
         path = os.path.join(output_dir, f"{name}.txt")
+        valid_stems = [get_valid_stem(img_id) for img_id in img_ids]
         with open(path, "w") as f:
-            for img_id in img_ids:
-                # Định dạng tên file gồm 6 chữ số số nguyên (vd: 001536) khớp 100% với file ảnh .jpg và XML trên Kaggle
-                formatted_name = f"{int(img_id):06d}" if str(img_id).isdigit() else str(img_id)
-                f.write(f"{formatted_name}\n")
-        print(f"Đã tạo {name}.txt với {len(img_ids)} ảnh.")
+            for stem in valid_stems:
+                f.write(f"{stem}\n")
+        print(f"Đã tạo {name}.txt với {len(valid_stems)} ảnh. Ví dụ mẫu: {valid_stems[:3]}")
 
 if __name__ == "__main__":
     prepare_splits()
