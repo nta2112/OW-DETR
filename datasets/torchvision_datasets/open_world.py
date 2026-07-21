@@ -137,7 +137,11 @@ class OWDetection(VisionDataset):
             self.images.extend([os.path.join(image_dir, x + ".jpg") for x in file_names])
             self.annotations.extend([os.path.join(annotation_dir, x + ".xml") for x in file_names])
 
-            self.imgids.extend(self.convert_image_id(x, to_integer=True) for x in file_names)
+            self.imgid2filename = getattr(self, 'imgid2filename', {})
+            for x in file_names:
+                int_id = self.convert_image_id(x, to_integer=True)
+                self.imgid2filename[int_id] = x
+                self.imgids.append(int_id)
             self.imgid2annotations.update(dict(zip(self.imgids, self.annotations)))
 
         if filter_pct > 0:
@@ -149,17 +153,24 @@ class OWDetection(VisionDataset):
                                                                                    self.annotations, self.imgids])
         assert (len(self.images) == len(self.annotations) == len(self.imgids))
 
-    @staticmethod
-    def convert_image_id(img_id, to_integer=False, to_string=False, prefix='2021'):
+    def convert_image_id(self, img_id, to_integer=False, to_string=False, prefix='2021'):
         if to_integer:
-            return int(prefix + img_id.replace('_', ''))
+            if isinstance(img_id, int):
+                return img_id
+            s = str(img_id).replace('_', '')
+            if s.isdigit():
+                return int(prefix + s)
+            digits = ''.join([c for c in s if c.isdigit()])
+            if digits:
+                return int(prefix + digits)
+            return abs(hash(str(img_id))) % (10**9)
         if to_string:
+            if hasattr(self, 'imgid2filename') and img_id in self.imgid2filename:
+                return self.imgid2filename[img_id]
             x = str(img_id)
-            assert x.startswith(prefix)
-            x = x[len(prefix):]
-            if len(x) == 12 or len(x) == 6:
-                return x
-            return x[:4] + '_' + x[4:]
+            if x.startswith(prefix):
+                x = x[len(prefix):]
+            return x
 
     @functools.lru_cache(maxsize=None)
     def load_instances(self, img_id):
