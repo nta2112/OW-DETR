@@ -9,35 +9,38 @@ def prepare_splits(
 ):
     """
     Chuẩn bị dữ liệu ImageSets cho IP102 dataset (25 lớp, chia làm 4 task):
-    - Task 1: 7 lớp (0..6)
-    - Task 2: 6 lớp (7..12)
-    - Task 3: 6 lớp (13..18)
-    - Task 4: 6 lớp (19..24)
+    - Task 1: 7 lớp (chỉ số 0..6)
+    - Task 2: 6 lớp (chỉ số 7..12)
+    - Task 3: 6 lớp (chỉ số 13..18)
+    - Task 4: 6 lớp (chỉ số 19..24)
     """
     print(f"Đang đọc file annotations: {coco_json_path}")
     coco = COCO(coco_json_path)
 
-    # Chia 25 lớp vào 4 task: Task 1 có 7 lớp, các task sau có 6 lớp
-    task_splits = {
-        't1': list(range(0, 7)),
-        't2': list(range(7, 13)),
-        't3': list(range(13, 19)),
-        't4': list(range(19, 25))
+    # Ánh xạ danh sách categories được sắp xếp theo ID sang chỉ số 0..24
+    cats = sorted(coco.loadCats(coco.getCatIds()), key=lambda c: c['id'])
+    
+    # Chia ID danh mục của 25 lớp vào 4 task
+    task_cat_ids = {
+        't1': set([c['id'] for c in cats[0:7]]),
+        't2': set([c['id'] for c in cats[7:13]]),
+        't3': set([c['id'] for c in cats[13:19]]),
+        't4': set([c['id'] for c in cats[19:25]])
     }
 
-    # 1. Tạo tập train cho từng task
+    # 1. Tạo tập train cho từng task dựa trên ID danh mục thực tế
     train_images = {}
-    for task_name, classes in task_splits.items():
+    for task_name, cat_ids in task_cat_ids.items():
         task_img_ids = set()
         for ann in coco.anns.values():
-            if ann['category_id'] in classes:
+            if ann['category_id'] in cat_ids:
                 task_img_ids.add(ann['image_id'])
         train_images[task_name] = sorted(list(task_img_ids))
 
     # Hàm lấy mẫu đại diện (exemplars) từ các lớp cũ để finetuning
-    def get_exemplars(class_ids, num_images_per_class=num_exemplars_per_class):
+    def get_exemplars(cat_ids_set, num_images_per_class=num_exemplars_per_class):
         exemplar_ids = set()
-        for cid in class_ids:
+        for cid in cat_ids_set:
             img_ids = [ann['image_id'] for ann in coco.anns.values() if ann['category_id'] == cid]
             selected = img_ids[:num_images_per_class]
             exemplar_ids.update(selected)
@@ -45,11 +48,12 @@ def prepare_splits(
 
     # 2. Tạo tập Finetuning (ft) giữ lại tri thức các task trước
     ft_images = {
-        't2': sorted(list(set(train_images['t2']).union(get_exemplars(task_splits['t1'])))),
-        't3': sorted(list(set(train_images['t3']).union(get_exemplars(task_splits['t1'] + task_splits['t2'])))),
-        't4': sorted(list(set(train_images['t4']).union(get_exemplars(task_splits['t1'] + task_splits['t2'] + task_splits['t3']))))
+        't2': sorted(list(set(train_images['t2']).union(get_exemplars(task_cat_ids['t1'])))),
+        't3': sorted(list(set(train_images['t3']).union(get_exemplars(task_cat_ids['t1'] | task_cat_ids['t2'])))),
+        't4': sorted(list(set(train_images['t4']).union(get_exemplars(task_cat_ids['t1'] | task_cat_ids['t2'] | task_cat_ids['t3']))))
     }
 
+    all_img_ids = sorted(list(coco.imgs.keys()))
     os.makedirs(output_dir, exist_ok=True)
 
     splits = {
@@ -59,7 +63,9 @@ def prepare_splits(
         't4_train': train_images['t4'],
         't2_ft': ft_images['t2'],
         't3_ft': ft_images['t3'],
-        't4_ft': ft_images['t4']
+        't4_ft': ft_images['t4'],
+        'val': all_img_ids,
+        'test': all_img_ids
     }
 
     for name, img_ids in splits.items():
