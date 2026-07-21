@@ -186,8 +186,20 @@ class OWDetection(VisionDataset):
             bbox = [float(bbox[x]) for x in ["xmin", "ymin", "xmax", "ymax"]]
             bbox[0] -= 1.0
             bbox[1] -= 1.0
+            
+            if cls in self.CLASS_NAMES:
+                cat_id = self.CLASS_NAMES.index(cls)
+            elif cls.isdigit() and int(cls) < len(self.CLASS_NAMES):
+                cat_id = int(cls)
+            elif cls.startswith("class_") and cls[6:].isdigit() and int(cls[6:]) < len(self.CLASS_NAMES):
+                cat_id = int(cls[6:])
+            elif "unknown" in self.CLASS_NAMES:
+                cat_id = self.CLASS_NAMES.index("unknown")
+            else:
+                cat_id = len(self.CLASS_NAMES) - 1
+
             instance = dict(
-                category_id=self.CLASS_NAMES.index(cls),
+                category_id=cat_id,
                 bbox=bbox,
                 area=(bbox[2] - bbox[0]) * (bbox[3] - bbox[1]),
                 image_id=img_id
