@@ -72,7 +72,10 @@ def prepare_splits(
         path = os.path.join(output_dir, f"{name}.txt")
         with open(path, "w") as f:
             for img_id in img_ids:
-                f.write(f"{img_id:06d}\n" if isinstance(img_id, int) else f"{img_id}\n")
+                # Lấy tên file thực tế loại bỏ đuôi mở rộng để khớp 100% với tên file ảnh và XML trên đĩa
+                file_name = coco.imgs[img_id]['file_name']
+                img_stem = os.path.splitext(file_name)[0]
+                f.write(f"{img_stem}\n")
         print(f"Đã tạo {name}.txt với {len(img_ids)} ảnh.")
 
 if __name__ == "__main__":
